@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head profile="http://dublincore.org/documents/dcq-html/">
+   <title>Fast pow() With Adjustable Accuracy - HXA7241 - 2007</title>
+
+   <link rel="schema.DC"       href="http://purl.org/dc/elements/1.1/" />
+   <meta name="DC.title"       content="Fast pow() With Adjustable Accuracy - HXA7241 - 2007" />
+   <meta name="DC.subject"     content="programming, optimization, C, C++, pow, floating-point, IEEE-754" />
+   <meta name="DC.description" content="A fast alternative to the standard C/C++ pow() function." />
+   <meta name="DC.type"        content="technical article" />
+   <meta name="DC.type"        content="Text" />
+   <link rel="DC.relation"     href="http://www.hxa.name/" />
+   <meta name="DC.creator"     content="Harrison Ainsworth / HXA7241" />
+   <meta name="DC.publisher"   content="Harrison Ainsworth / HXA7241" />
+   <meta name="DC.rights"      content="Creative Commons BY-SA 3.0 License." />
+   <meta name="DC.date"        content="2007-11-25" />
+   <meta name="DC.format"      content="text/html" />
+   <meta name="DC.format"      content="css1" />
+   <meta name="DC.language"    content="en" />
+   <link rel="DC.identifier"   href="http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.html" />
+
+   <meta name="keywords"       content="programming, optimization, C, C++, pow, floating-point, IEEE-754" />
+   <meta name="description"    content="A fast alternative to the standard C/C++ pow() function." />
+   <meta name="document"       content="hxa7241article5" />
+   <meta name="license"        content="Creative Commons by-sa 3.0" />
+
+   <link rel="stylesheet" type="text/css" href="hxa7241-article.css" />
+
+   <script id="hxa7241-js" type="application/x-javascript" src="../../style/hxa7241.js"></script>
+</head>
+
+
+<body>
+<div class="edge" id="header"><div><a href="http://www.hxa.name/articles/">HXA articles</a></div></div>
+
+<div class="paper">
+
+
+<div id="heading">
+   <h1>Fast pow() With Adjustable Accuracy</h1>
+</div>
+
+
+<div id="colophon">
+<h4>Harrison Ainsworth</h4>
+
+   <p id="contact"><a href="http://www.hxa.name/">http://www.hxa.name/</a>
+   <br />artifex <i>(&alpha;&tau;)</i> hxa7241 <i>(d&omicron;&tau;)</i> org</p>
+
+   <p id="timestamp">2007-11-25</p>
+</div>
+
+
+<div id="preface">
+   <div id="summary">
+      <h2>Summary</h2>
+      <p>A fast alternative to the standard C/C++ pow() function. With adjustable accuracy-space tradeoff. (1400 words)</p>
+   </div>
+
+   <dl id="metadata" class="plainlist">
+      <dt>subject</dt>
+      <dd>programming, optimization, C, C++, pow, floating-point, IEEE-754</dd>
+
+      <dt>uri</dt>
+      <dd><a href="http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.html">http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.html</a></dd>
+
+      <dt>license</dt>
+      <dd><a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/">Creative Commons BY-SA 3.0 License</a>.</dd>
+
+      <dt>download</dt>
+      <dd>Source code in C and C++: <a href="http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.zip">http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.zip</a></dd>
+   </dl>
+</div>
+
+
+<div id="contents">
+   <h2>Contents</h2>
+   <ul>
+      <li><a href="#desc">Description</a></li>
+      <li><a href="#code">Code</a></li>
+      <li><a href="#explanation">Explanation</a></li>
+      <li><a href="#supplement">Supplement</a></li>
+      <li><a href="#download">Download</a></li>
+      <li><a href="#license">License</a></li>
+   </ul>
+</div>
+
+
+<div id="text">
+
+<div class="section" id="desc">
+<h2>Description</h2>
+
+   <p>This technique is formed of two ideas: manipulation of IEEE-754 floating-point bits, and precalculation of a lookup table.</p>
+
+   <h3>Float Bits</h3>
+   <p>First, a fast <code>pow</code>:</p>
+
+      <blockquote><p><i>&lsquo;A Fast, Compact Approximation of the Exponential Function&rsquo;</i><br/>
+      Technical Report IDSIA-07-98;<br/>
+      Nicol N. Schraudolph;<br/>
+      IDSIA,<br/>
+      1998-06-24.<br/>
+      <a href="http://users.rsise.anu.edu.au/~nici/bib2html/b2hd-Schraudolph99.html">http://users.rsise.anu.edu.au/~nici/bib2html/b2hd-Schraudolph99.html</a><br/>
+      <a href="http://www.idsia.ch/idsiareport/IDSIA-07-98.ps.gz">http://www.idsia.ch/idsiareport/IDSIA-07-98.ps.gz</a></p></blockquote>
+
+   <p>&mdash; was re-written for <code>float</code> implementation instead of <code>double</code> (avoiding endian platform dependence of original). It works by inserting the submitted number into the exponent bits of the answer. The fractional-part makes a linear interpolation in the mantissa (simple and fast, but inaccurate). Or it can be used as follows.</p>
+
+   <h3>Lookup Table</h3>
+   <p>Second, an adjustable fast <code>log</code>:</p>
+
+      <blockquote><p><i>&lsquo;Revisiting a basic function on current CPUs: A fast logarithm implementation<br/>
+      with adjustable accuracy&rsquo;</i><br/>
+      Technical Report ICSI TR-07-002;<br/>
+      Oriol Vinyals, Gerald Friedland, Nikki Mirghafori;<br/>
+      ICSI,<br/>
+      2007-06-21.<br/>
+      <a href="http://www.icsi.berkeley.edu/cgi-bin/pubs/publication.pl?ID=002209">http://www.icsi.berkeley.edu/cgi-bin/pubs/publication.pl?ID=002209</a><br/>
+      <a href="http://www.icsi.berkeley.edu/pubs/techreports/TR-07-002.pdf">http://www.icsi.berkeley.edu/pubs/techreports/TR-07-002.pdf</a></p></blockquote>
+
+   <p>&mdash; was adapted to fit the fast <code>pow</code> core (and modified to be twice as accurate). This uses the mantissa bits to index a lookup table. The table value then replaces the mantissa.</p>
+
+   <p>Precision is adustable from 0 to 18. This is how many bits to use as index, and hence how large the table is: 4B to 1MB.</p>
+
+   <p>For precision 11 (8KB table), mean error is &lt; 0.01%, and max error is &lt; 0.02% (proportional, ie: <i>abs(true - approx) / true</i>). And, on one machine, it was over 9 times faster than standard <code>pow</code>.</p>
+</div>
+
+
+<div class="section" id="code">
+<h2>Code</h2>
+
+   <p>In C (89) (and assuming 32 bit integers), the core is:</p>
+   
+   <pre><code>const float _2p23 = 8388608.0f;
+
+
+/**
+ * Initialize powFast lookup table.
+ *
+ * @pTable     length must be 2 ^ precision
+ * @precision  number of mantissa bits used, &gt;= 0 and &lt;= 18
+ */
+void powFastSetTable
+(
+   unsigned int* const pTable,
+   const unsigned int  precision
+)
+{
+   /* step along table elements and x-axis positions */
+   float zeroToOne = 1.0f / ((float)(1 &lt;&lt; precision) * 2.0f);        /* A */
+   int   i;                                                          /* B */
+   for( i = 0;  i &lt; (1 &lt;&lt; precision);  ++i )                         /* C */
+   {
+      /* make y-axis value for table element */
+      const float f = ((float)pow( 2.0f, zeroToOne ) - 1.0f) * _2p23;
+      pTable[i] = (unsigned int)( f &lt; _2p23 ? f : (_2p23 - 1.0f) );
+
+      zeroToOne += 1.0f / (float)(1 &lt;&lt; precision);
+   }                                                                 /* D */
+}
+
+
+/**
+ * Get pow (fast!).
+ *
+ * @val        power to raise radix to
+ * @ilog2      one over log, to required radix, of two
+ * @pTable     length must be 2 ^ precision
+ * @precision  number of mantissa bits used, &gt;= 0 and &lt;= 18
+ */
+float powFastLookup
+(
+   const float         val,
+   const float         ilog2,
+   unsigned int* const pTable,
+   const unsigned int  precision
+)
+{
+   /* build float bits */
+   const int i = (int)( (val * (_2p23 * ilog2)) + (127.0f * _2p23) );
+
+   /* replace mantissa with lookup */
+   const int it = (i &amp; 0xFF800000) | pTable[(i &amp; 0x7FFFFF) &gt;&gt;        /* E */
+      (23 - precision)];                                             /* F */
+
+   /* convert bits to float */
+   return *(const float*)( &amp;it );
+}</code></pre>
+   
+   <p>Setting the <code>ilog2</code> parameter:</p>
+   <ul>
+      <li>for <code>pow( 2, val)</code>, <code>ilog2 = 1 / log2(2)  = 1</code></li>
+      <li>for <code>pow( <i>e</i>, val)</code>, <code>ilog2 = 1 / log(2)   = 1.44269504088896</code></li>
+      <li>for <code>pow(10, val)</code>, <code>ilog2 = 1 / log10(2) = 3.32192809488736</code></li>
+      <li>for <code>pow( r, val)</code>, <code>ilog2 = log(r) / log(2) = log(r) * 1.44269504088896</code></li>
+   </ul>
+
+   <p>These two functions can easily be put in a small class/module that manages the storage and wraps calls for different radixes.</p>
+</div>
+
+
+<div class="section" id="explanation">
+<h2>Explanation</h2>
+
+   <h3>Twiddling</h3>
+   <p>An IEEE-754 single-precision floating point number comprises a sign, exponent, and mantissa, with value: <i>(sign)mantissa * 2<sup>exponent</sup></i>. The exponent is -125 to +128, the mantissa is 1 to 2 - 2<sup>-23</sup> (and the sign is + or -). The bit-representation is slightly different. The exponent is 8 bits with 127 added (the bias), and the mantissa is 23 bits with an implicit extra 1 assumed, but not stored, as its next higher bit. This is the form of a usual number.</p>
+
+   <table border="1" cellspacing="0" cellpadding="4" summary="IEEE-754 single FP anatomy">
+      <tr>
+         <th>sign</th>
+         <th>exponent</th>
+         <th>mantissa</th>
+      </tr>
+      <tr>
+         <td align="right">S</td>
+         <td align="right">EEEEEEEE</td>
+         <td align="right">MMMMMMMMMMMMMMMMMMMMMMM</td>
+      </tr>
+      <tr>
+         <td align="right"><small>31</small></td>
+         <td align="right"><small>23</small></td>
+         <td align="right"><small>0</small></td>
+      </tr>
+   </table>
+
+   <p>Considering the parts as plain integer numbers, the value is: <i>(+/-)(1 + mantissa/2<sup>23</sup>) * 2<sup>(exponent - 127)</sup></i>. So, for example, to make 2.5, set the exponent to <code>128</code> and the mantissa to <code>0x200000</code>, shift them into position, and reinterpret as a float.</p>
+   
+   <p>If you set the exponent to an integer number, and the mantissa to zero, you effectively get <code>pow(2,number)</code>. That leaves fractional numbers. An <span title="Engineering Mathematics | Croft, Davison, Hargreaves | Addison Wesley | 1996 | 0-201-87744-9">Engineering Mathematics</span> book will show that <span title="oh no! it's an equation!"><i>a<sup>(b + c)</sup> = a<sup>b</sup> * a<sup>c</sup></i></span>, which in this case can be <i>2<sup>(int + frac)</sup> = 2<sup>int</sup> * 2<sup>frac</sup></i>. This separates the fractional calculation into something constant for all integers. And it matches the IEEE-754 machinery of <i>mantissa * 2<sup>exponent</sup></i>: setting the exponent and mantissa bits to <i>int</i> and <i>2<sup>frac</sup></i>, and reinterpreting, will do the calculation.</p>
+   
+   <p>The range of <i>2<sup>frac</sup></i> is 1 to &lt;2 &mdash; the same as the usual mantissa. So if the fractional part of the power is simply placed in the mantissa bits, it gives an approximation by linear interpolation (<i>0 &le; <i>x</i> &lt; 1 &rarr; 1 &le; <i>y</i> &lt; 2</i>). This is simplest and fastest, if up to 7% error is tolerable. Or a higher order, perhaps spline, interpolation can be calculated. Or, as here, a precalculated table can be queried.</p>
+   
+   <p>There are 23 bits of mantissa, but the maximum precision is 18. This is because 5 bits are used by the integer part of the power.</p>
+
+   <p>(For other radixes, multiply the power by <i>ln(radix) / ln(2)</i>.)</p>
+
+   <h3>Rounding</h3>
+   <p>The essential approximation is a &lsquo;staircase&rsquo; function across the fraction range between successive integer powers. It has full float precision <i>y</i> values, but at limited regular <i>x</i> intervals. Accuracy is proportional to number of table elements.</p>
+
+   <p>Those limited intervals imply rounding considerations for setting and looking-up the table values. The mantissa could be rounded before truncation for table look-up. This costs a few instructions in speed. But instead this can be treated when setting the table. Set the table values for the middles of the <i>x</i> intervals &mdash; so line A (in the code) starts the iteration half an increment across. This (practically) minimises error. (Better would be the mean of the <i>y</i> values across each interval. But the improvement would be small for these circumstances.)</p>
+
+   <h3>Radix 2</h3>
+   <p>This solution has a small weakness: for radix two it produces inexact results for integer powers when it need not. This may be undesirable, since they are &lsquo;special&rsquo;. One treatment is to round the mantissa, as mentioned before:</p>
+
+   <p>in <code>powFastSetTable</code>, change lines A-C to:</p>
+   <pre><code>float zeroToOne = 0.0f;
+int   i;
+for( i = 0;  i &lt; ((1 &lt;&lt; precision) + 1);  ++i )</code></pre>
+
+   <p>&mdash; in <code>powFastLookup</code>, change lines E-F to:</p>
+   <pre><code>/* (rounding mantissa-index before use) */
+const int it = (i &amp; 0xFF800000) | pTable[((i &amp; 0x7FFFFF) + (0x400000 &gt;&gt;
+   precision)) &gt;&gt; (23 - precision)];</code></pre>
+
+   <p>&mdash; and the table is one element longer for all precisions (so change the <code>@pTable</code> comments too).</p>
+
+   <p>Instead, add a special case to set the first table element (the integer value) to zero. It avoids the rounding cost, but almost doubles max error in the first interval.</p>
+
+   <p>in <code>powFastSetTable</code>, add after line D:</p>
+   <pre><code>/* make integer power exact */
+pTable[0] = 0;</code></pre>
+</div>
+
+
+<div class="section" id="supplement">
+<h2>Supplement</h2>
+
+   <p>It is possible to have maximum precision with medium precision table size (max error &lt; 0.002%, 4KB instead of 1MB). The cost in speed is quite small &mdash; a few extra instructions.</p>
+
+   <p>The power equation above suggests the further reformulation. Just as the fractional calculation is separable from the integer calculation, the fractional one can itself be separated into parts: eg. <i>2<sup>(frachigh + fraclow)</sup> = 2<sup>frachigh</sup> * 2<sup>fraclow</sup></i>. Breaking it into two is probably the most useful.</p>
+   
+   <p>Here is an excerpt from a C++ class:</p>
+   
+   <pre><code>PowFast2::PowFast2()
+{
+   setTable( tableH_m,  9, 9, false );
+   setTable( tableL_m, 18, 9, true  );
+}
+
+
+void PowFast2::setTable
+(
+   float* const pTable,
+   const udword precision,
+   const udword extent,
+   const bool   isRound
+)
+{
+   // step along table elements and x-axis positions
+   float zeroToOne = !isRound ?
+      0.0f : (1.0f / (static_cast&lt;float&gt;(1 &lt;&lt; precision) * 2.0f));
+   for( int i = 0;  i &lt; (1 &lt;&lt; extent);  ++i )
+   {
+      // make y-axis value for table element
+      pTable[i] = ::powf( 2.0f, zeroToOne );
+
+      zeroToOne += 1.0f / static_cast&lt;float&gt;(1 &lt;&lt; precision);
+   }
+}
+
+
+inline
+float PowFast2::lookup
+(
+   const float val,
+   const float ilog2
+) const
+{
+   const float _2p23 = 8388608.0f;
+
+   // build float bits
+   const int i = static_cast&lt;int&gt;( (val * (_2p23 * ilog2)) + (127.0f * _2p23) );
+
+   // replace mantissa with combined lookups
+   const float t  = tableH_m[(i &gt;&gt; 14) &amp; 0x1FF] * tableL_m[(i &gt;&gt; 5) &amp; 0x1FF];
+   const int   it = (i &amp; 0xFF800000) |
+      (*reinterpret_cast&lt;const int*&gt;( &amp;t ) &amp; 0x7FFFFF);
+
+   // convert bits to float
+   return *reinterpret_cast&lt;const float*&gt;( &amp;it );
+}</code></pre>
+
+   <p>The limit is separating each bit. This yields 18 two-element tables, combinable with 17 multiplies. Since the first elements are all 1, only 8.5 multiplies are needed on average, if branching is used.</p>
+</div>
+
+
+<div class="section" id="download">
+<h2>Download</h2>
+
+   <p>Here are two source-code packages, including tests. In C++ as a simple constant class, and in C with an object interface:</p>
+
+   <p><a href="http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.zip">http://www.hxa.name/articles/content/fast-pow-adjustable_hxa7241_2007.zip</a></p>
+</div>
+
+
+<div class="section" id="license">
+<h2>License</h2>
+
+   <p>The source code is available according to the (new) BSD license:</p>
+   <p>&mdash;&mdash;&mdash;</p>
+
+   <div class="licensenotice">
+      <p>Copyright (c) 2007, Harrison Ainsworth / HXA7241.</p>
+
+      <p>Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:</p>
+
+      <ul>
+         <li>Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.</li>
+         <li>Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.</li>
+         <li>The name of the author may not be used to endorse or promote products derived from this software without specific prior written permission.</li>
+      </ul>
+
+      <p>THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</p>
+   </div>
+</div>
+
+</div>
+
+
+</div><!--paper-->
+
+<div class="edge" id="footer"><div><a href="http://www.hxa.name/articles/">http://www.hxa.name/articles/</a></div></div>
+
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-596081-1";
+urchinTracker();
+</script>
+
+</body>
+
+</html>
